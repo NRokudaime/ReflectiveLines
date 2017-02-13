@@ -10,50 +10,66 @@ import UIKit
 
 class TappedView: UIView {
     
-    enum Surface {
+    fileprivate enum Surface {
         case xMax
         case yMax
         case yMin
         case xMin
     }
-    var touches: [UITouch]?
-
-    var tapPoint: CGPoint? {
-        didSet{
-            setNeedsDisplay()
+    fileprivate var touches: Set<UITouch>?
+    
+    func setTouches(touches: Set<UITouch>) {
+        if self.touches != nil {
+            for touch in touches {
+                self.touches?.insert(touch)
+            }
+        } else {
+            self.touches = touches
         }
+        setNeedsDisplay()
+    }
+    
+    func removeTouches(touches: Set<UITouch>) {
+        for touch in touches {
+            _ = self.touches?.remove(touch)
+        }
+        setNeedsDisplay()
     }
     
     override func draw(_ rect: CGRect) {
         if let context = UIGraphicsGetCurrentContext(),
-            let tapPoint = tapPoint {
+            let touches = touches {
             context.setLineWidth(3)
-            context.setStrokeColor(UIColor.black.cgColor)
-            let angle = angleBetween(startPoint: center, endPoint: tapPoint)
-            let centerX = Float(center.x)
-            let centerY = Float(center.y)
+            for touch in touches {
+                let tapPoint = touch.location(in: self)
+                context.setStrokeColor(color)
+                let angle = angleBetween(startPoint: center, endPoint: tapPoint)
+                let centerX = Float(center.x)
+                let centerY = Float(center.y)
 
-            let hipo = Float((bounds.width / 2)) / cos(angle)
-            var endPoint = CGPoint(x: Double(cos(angle) * abs(hipo) + centerX),
-                                   y: Double(sin(angle) * abs(hipo) + centerY))
-            endPoint = clipPoint(point: endPoint)
-            
-            context.addLines(between: [center, endPoint])
-            var startPoint = center
-            for _ in (0..<2) {
-                if let newPoint = mirrorPoint(for: startPoint, endPoint: endPoint) {
-                    context.addLines(between: [endPoint, newPoint])
-                    startPoint = endPoint
-                    endPoint = newPoint
+                let hipo = Float((bounds.width / 2)) / cos(angle)
+                var endPoint = CGPoint(x: Double(cos(angle) * abs(hipo) + centerX),
+                                       y: Double(sin(angle) * abs(hipo) + centerY))
+                endPoint = clipPoint(point: endPoint)
+                
+                context.addLines(between: [center, endPoint])
+                var startPoint = center
+                for _ in (0..<2) {
+                    if let newPoint = mirrorPoint(for: startPoint, endPoint: endPoint) {
+                        context.addLines(between: [endPoint, newPoint])
+                        startPoint = endPoint
+                        endPoint = newPoint
+                    }
                 }
             }
             context.strokePath()
         }
     }
     
-    func mirrorPoint(for startPoint: CGPoint, endPoint: CGPoint) -> CGPoint? {
+     fileprivate func mirrorPoint(for startPoint: CGPoint, endPoint: CGPoint) -> CGPoint? {
         let coeffX = abs(endPoint.x - startPoint.x) / abs(endPoint.y - startPoint.y)
         let coeffY = abs(endPoint.y - startPoint.y) / abs(endPoint.x - startPoint.x)
+        var newPoint = CGPoint.zero
         
         if let surf = getSurface(point: endPoint) {
             switch surf {
@@ -63,28 +79,24 @@ class TappedView: UIView {
                     let xx = bounds.width / coeffX
                     let nextEdgeIsX = xx < endPoint.y
                     
-                    var newX:CGFloat = 0
-                    var newY:CGFloat = startPoint.y > endPoint.y ? 0 : bounds.height
+                    newPoint.x = 0
+                    newPoint.y = startPoint.y > endPoint.y ? 0 : bounds.height
                     if nextEdgeIsX {
-                        newY = endPoint.y - bounds.width / coeffX
+                        newPoint.y = endPoint.y - bounds.width / coeffX
                     } else {
-                        newX = endPoint.x - endPoint.y / coeffY
+                        newPoint.x = endPoint.x - endPoint.y / coeffY
                     }
-                    let newPoint = CGPoint(x: newX, y: newY)
-                    return newPoint
                 } else {
                     let xx = bounds.width / coeffX
                     let nextEdgeIsX = xx < bounds.height - endPoint.y
                     
-                    var newX:CGFloat = 0
-                    var newY:CGFloat = startPoint.y > endPoint.y ? 0 : bounds.height
+                    newPoint.x = 0
+                    newPoint.y = startPoint.y > endPoint.y ? 0 : bounds.height
                     if nextEdgeIsX {
-                        newY = endPoint.y + bounds.width / coeffX
+                        newPoint.y = endPoint.y + bounds.width / coeffX
                     } else {
-                        newX = endPoint.x - endPoint.y / coeffY
+                        newPoint.x = endPoint.x - endPoint.y / coeffY
                     }
-                    let newPoint = CGPoint(x: newX, y: newY)
-                    return newPoint
                 }
             case .xMin:
                 if endPoint.y < bounds.height / 2 {
@@ -92,98 +104,82 @@ class TappedView: UIView {
                     let xx = bounds.width / coeffX
                     let nextEdgeIsX = xx < endPoint.y
                     
-                    var newX:CGFloat = bounds.width
-                    var newY:CGFloat = startPoint.y > endPoint.y ? 0 : bounds.height
+                    newPoint.x = bounds.width
+                    newPoint.y = startPoint.y > endPoint.y ? 0 : bounds.height
                     if nextEdgeIsX {
-                        newY = endPoint.y - bounds.width / coeffX
+                        newPoint.y = endPoint.y - bounds.width / coeffX
                     } else {
-                        newX = endPoint.x + endPoint.y / coeffY
+                        newPoint.x = endPoint.x + endPoint.y / coeffY
                     }
-                    let newPoint = CGPoint(x: newX, y: newY)
-                    return newPoint
                 } else {
                     let xx = bounds.width / coeffX
                     let nextEdgeIsX = xx < bounds.height - endPoint.y
-                    
-                    var newX:CGFloat = bounds.width
-                    var newY:CGFloat = startPoint.y > endPoint.y ? 0 : bounds.height
+                    newPoint.x = bounds.width
+                    newPoint.y = startPoint.y > endPoint.y ? 0 : bounds.height
                     if nextEdgeIsX {
-                        newY = endPoint.y + bounds.width / coeffX
+                        newPoint.y = endPoint.y + bounds.width / coeffX
                     } else {
-                        newX = (bounds.height - endPoint.y) / coeffY
+                        newPoint.x = (bounds.height - endPoint.y) / coeffY
                     }
-                    let newPoint = CGPoint(x: newX, y: newY)
-                    return newPoint
                 }
             case .yMax:
                 if endPoint.x < bounds.width / 2 {
-                    
                     let yy = bounds.height / coeffY
                     let nextEdgeIsY = yy < endPoint.x
                     
-                    var newX:CGFloat = startPoint.x > endPoint.x ? 0 : bounds.width
-                    var newY:CGFloat = startPoint.x > endPoint.x ? 0 : bounds.height
+                    newPoint.x = startPoint.x > endPoint.x ? 0 : bounds.width
+                    newPoint.y = startPoint.x > endPoint.x ? 0 : bounds.height
                     if nextEdgeIsY {
-                        newX = endPoint.x - bounds.height / coeffY
+                        newPoint.x = endPoint.x - bounds.height / coeffY
                     } else {
-                        newY = endPoint.y - endPoint.x / coeffX
+                        newPoint.y = endPoint.y - endPoint.x / coeffX
                     }
-                    let newPoint = CGPoint(x: newX, y: newY)
-                    return newPoint
                 } else {
                     let yy = bounds.height / coeffY
                     let nextEdgeIsY = yy < (bounds.width - endPoint.x)
                     
-                    var newX:CGFloat = startPoint.x > endPoint.x ? 0 : bounds.width
-                    var newY:CGFloat = startPoint.x > endPoint.x ? 0 : bounds.height
+                    newPoint.x = startPoint.x > endPoint.x ? 0 : bounds.width
+                    newPoint.y = 0
                     if nextEdgeIsY {
-                        newX = endPoint.x + bounds.height / coeffY
+                        newPoint.x = endPoint.x + bounds.height / coeffY
                     } else {
-                        newY = endPoint.y - (bounds.width - endPoint.x) / coeffX
+                        newPoint.y = endPoint.y - (bounds.width - endPoint.x) / coeffX
                     }
-                    let newPoint = CGPoint(x: newX, y: newY)
-                    return newPoint
                 }
             case .yMin:
                 if endPoint.x < bounds.width / 2 {
-                    
                     let yy = bounds.height / coeffY
                     let nextEdgeIsY = yy < endPoint.x
-                    
-                    var newX:CGFloat = bounds.width
-                    var newY:CGFloat = startPoint.y > endPoint.y ? 0 : bounds.height
+                    newPoint.x = startPoint.x < endPoint.x ? bounds.width : 0
+                    newPoint.y = bounds.height
                     if nextEdgeIsY {
-                        newX = endPoint.x - bounds.height / coeffY
+                        newPoint.x = endPoint.x - bounds.height / coeffY
                     } else {
-                        newY = endPoint.y + endPoint.x / coeffX
+                        newPoint.y = endPoint.y + endPoint.x / coeffX
                     }
-                    let newPoint = CGPoint(x: newX, y: newY)
-                    return newPoint
                 } else {
                     let yy = bounds.height / coeffY
                     let nextEdgeIsY = yy < (bounds.width - endPoint.x)
                     
-                    var newX:CGFloat = startPoint.x < endPoint.x ? bounds.width : 0
-                    var newY:CGFloat = startPoint.x < endPoint.x ? bounds.height : 0
+                    newPoint.x = startPoint.x < endPoint.x ? bounds.width : 0
+                    newPoint.y = startPoint.x < endPoint.x ? bounds.height : 0
                     if nextEdgeIsY {
-                        newX = endPoint.x + bounds.height / coeffY
+                        newPoint.x = endPoint.x + bounds.height / coeffY
                     } else {
-                        newY = (bounds.width - endPoint.x) / coeffX
+                        newPoint.y = (bounds.width - endPoint.x) / coeffX
                     }
-                    let newPoint = CGPoint(x: newX, y: newY)
-                    return newPoint
                 }
             }
         }
-        return nil
+        return newPoint
     }
     
-    func angleBetween(startPoint: CGPoint, endPoint: CGPoint) -> Float {
+    fileprivate func angleBetween(startPoint: CGPoint, endPoint: CGPoint) -> Float {
         let originPoint = CGPoint(x: endPoint.x - startPoint.x, y: endPoint.y - startPoint.y)
         return atan2f(Float(originPoint.y), Float(originPoint.x))
     }
     
-    func clipPoint(point: CGPoint) -> CGPoint {
+    fileprivate func clipPoint(point: CGPoint) -> CGPoint {
         var normalizedPoint = point
         if point.y < 0 || point.y > bounds.height {
             let yLenth = abs(point.y - center.y)
@@ -210,7 +206,7 @@ class TappedView: UIView {
         return normalizedPoint
     }
     
-    func getSurface(point: CGPoint) -> Surface? {
+    fileprivate func getSurface(point: CGPoint) -> Surface? {
         if point.x <= 0 {
             return .xMin
         } else if point.x >= bounds.width {
@@ -221,5 +217,13 @@ class TappedView: UIView {
             return .yMax
         }
         return nil
+    }
+    
+    var color: CGColor {
+        let hue:CGFloat = ( CGFloat(arc4random() % 256) / 256 )
+        let saturation:CGFloat = ( CGFloat(arc4random() % 128) / 256.0 ) + 0.5
+        let brightness:CGFloat = ( CGFloat(arc4random() % 128) / 256.0 ) + 0.5
+        let color = UIColor(hue: hue, saturation: saturation, brightness: brightness, alpha: 1.0)
+        return color.cgColor
     }
 }
